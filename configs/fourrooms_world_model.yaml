@@ -1,0 +1,68 @@
+project:
+  name: minidreamer-fourrooms
+  seed: 0
+
+env:
+  id: MiniGrid-FourRooms-v0
+  rgb_partial_obs: true
+  image_only: true
+  resize: [64, 64]
+  normalize_obs: true
+  action_space: full
+
+replay:
+  capacity_episodes: 5000
+  sequence_length: 32
+  batch_size: 32
+  train_fraction: 0.8
+  val_fraction: 0.1
+  test_fraction: 0.1
+  split_key: episode_id
+
+collection:
+  bootstrap_env_steps: 5000
+  bootstrap_success_threshold: 20
+  bootstrap_fallback_policy: restricted_random_3_actions
+  bootstrap_env_step_cap: 20000
+  collect_steps_per_iteration: 1000
+  gradient_updates_per_iteration: 1000
+  train_collect_ratio: 1.0
+  random_action_fraction_after_planner: 0.3
+
+model:
+  embedding_dim: 256
+  deter_dim: 256
+  stoch_dim: 32
+  hidden_dim: 256
+  use_decoder: true
+  min_std: 0.1
+
+training:
+  optimizer: adam
+  lr: 0.0003
+  grad_clip_norm: 100.0
+  train_steps: 100000
+  beta_kl: 1.0
+  free_nats: 1.0
+  beta_recon: 1.0
+  beta_reward: 1.0
+  beta_done: 1.0
+  device: null
+
+planner:
+  type: discrete_cem
+  horizon: 8
+  candidates: 256
+  elites: 32
+  iterations: 4
+  discount: 0.99
+  use_done_mask: true
+
+evaluation:
+  episodes: 100
+  seeds: [0, 1, 2]
+  eval_every_env_steps: 10000
+
+comparison:
+  env_steps: [10000, 25000, 50000, 100000]
+

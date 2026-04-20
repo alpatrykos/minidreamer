@@ -1,0 +1,16 @@
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.DS_Store
+
+artifacts/
+checkpoints/
+metrics/
+data/
+logs/

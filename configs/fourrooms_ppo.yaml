@@ -1,0 +1,31 @@
+project:
+  name: minidreamer-fourrooms-ppo
+  seed: 0
+
+env:
+  id: MiniGrid-FourRooms-v0
+  rgb_partial_obs: true
+  image_only: true
+  resize: [64, 64]
+  normalize_obs: true
+
+ppo:
+  total_timesteps: 100000
+  num_envs: 4
+  learning_rate: 0.0003
+  n_steps: 256
+  batch_size: 256
+  n_epochs: 4
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  features_dim: 256
+  device: auto
+
+evaluation:
+  episodes: 100
+  seeds: [0, 1, 2]
+  eval_every_env_steps: 10000
+

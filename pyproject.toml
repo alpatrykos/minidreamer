@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "minidreamer"
+version = "0.1.0"
+description = "PlaNet-style world model planning for pixel-based MiniGrid"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = { file = "LICENSE" }
+authors = [{ name = "OpenAI Codex" }]
+dependencies = [
+  "gymnasium>=0.29,<1.1",
+  "minigrid>=2.3.1",
+  "numpy>=1.26,<3",
+  "pillow>=10.0",
+  "pyyaml>=6.0",
+  "torch>=2.3,<3",
+  "tqdm>=4.66",
+  "matplotlib>=3.8",
+  "stable-baselines3>=2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+]
+
+[project.scripts]
+minidreamer-collect-random = "minidreamer.data.collect_random:main"
+minidreamer-train-world-model = "train_world_model:main"
+minidreamer-evaluate = "evaluate:main"
+minidreamer-train-ppo = "minidreamer.baselines.train_ppo:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["train_world_model", "evaluate"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["minidreamer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
