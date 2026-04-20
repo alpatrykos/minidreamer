@@ -1,8 +1,8 @@
 # MiniDreamer
 
-MiniDreamer is a research-grade PlaNet-style world model project for `MiniGrid-FourRooms-v0`. It learns a recurrent latent dynamics model from partial RGB observations, predicts reward and episode termination, and uses discrete CEM planning in latent space.
+MiniDreamer is a PlaNet-style world model project for `MiniGrid-FourRooms-v0`. It learns a recurrent latent dynamics model from partial RGB observations, predicts reward and episode termination, and uses discrete CEM planning in latent space.
 
-The repository now contains the full implementation scaffold:
+The repository contains:
 
 - MiniGrid RGB environment wrappers and bootstrap trajectory collection
 - Episode-aware replay buffer with reproducible train/val/test splits
@@ -11,7 +11,7 @@ The repository now contains the full implementation scaffold:
 - PPO baseline entrypoint with a MiniGrid-compatible CNN feature extractor
 - Evaluation code, configs, scripts, tests, and project documentation
 
-Training has not been run yet, per the project requirement.
+Training has not been run yet.
 
 ## Layout
 
@@ -64,6 +64,4 @@ PPO baseline:
 
 ## Notes
 
-- The implementation follows the supplied project spec closely, with explicit clarifications captured in [docs/spec_clarifications.md](/Users/patryktargosinski/minidreamer/docs/spec_clarifications.md).
 - Result placeholders and reporting structure are in [results.md](/Users/patryktargosinski/minidreamer/results.md).
-
