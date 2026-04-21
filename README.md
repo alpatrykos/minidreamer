@@ -11,7 +11,7 @@ The repository contains:
 - PPO baseline entrypoint with a MiniGrid-compatible CNN feature extractor
 - Evaluation code, configs, scripts, tests, and project documentation
 
-Training has not been run yet.
+A complete training run has been executed. A summary is recorded in [results.md](/Users/patryktargosinski/minidreamer/results.md), while run artifacts remain gitignored under `artifacts/world_model/`.
 
 ## Layout
 
@@ -50,6 +50,16 @@ World-model pipeline:
 ./scripts/train_world_model.sh
 ```
 
+Resume an interrupted world-model run from a checkpoint:
+
+```bash
+python3.11 src/train_world_model.py \
+  --config configs/fourrooms_world_model.yaml \
+  --output-dir artifacts/world_model \
+  --replay-dir artifacts/world_model/replay \
+  --resume-checkpoint artifacts/world_model/checkpoints/world_model_env_steps_90021.pt
+```
+
 Planner evaluation from a checkpoint:
 
 ```bash
@@ -64,4 +74,5 @@ PPO baseline:
 
 ## Notes
 
-- Result placeholders and reporting structure are in [results.md](/Users/patryktargosinski/minidreamer/results.md).
+- The latest completed run summary is in [results.md](/Users/patryktargosinski/minidreamer/results.md).
+- Metrics, replay snapshots, and checkpoints are written to `artifacts/world_model/` and are intentionally gitignored.

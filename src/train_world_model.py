@@ -9,7 +9,7 @@ import torch
 from torch.nn.utils import clip_grad_norm_
 from tqdm import trange
 
-from minidreamer.config import ensure_run_dirs, load_config, save_config
+from minidreamer.config import ensure_run_dirs, load_config, merge_dicts, save_config
 from minidreamer.data.collect_random import collect_bootstrap_dataset
 from minidreamer.data.replay_buffer import ReplayBuffer
 from minidreamer.evaluation import evaluate_random_policy, evaluate_world_model
@@ -51,6 +51,31 @@ def train_world_model_updates(
         logs.append(log_row)
         progress.set_postfix({key: f"{value:.3f}" for key, value in log_row.items()})
     return logs
+
+
+def optimizer_to_device(optimizer: torch.optim.Optimizer, device: torch.device) -> None:
+    for state in optimizer.state.values():
+        for key, value in state.items():
+            if torch.is_tensor(value):
+                state[key] = value.to(device)
+
+
+def load_training_state(
+    checkpoint_path: str | Path,
+    config: dict[str, Any],
+    action_dim: int,
+    device: torch.device,
+) -> tuple[dict[str, Any], WorldModel, torch.optim.Optimizer, dict[str, Any]]:
+    payload = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    resolved_config = merge_dicts(payload["config"], config)
+    model = WorldModel.from_config(resolved_config, action_dim=action_dim).to(device)
+    model.load_state_dict(payload["model_state"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(resolved_config["training"]["lr"]))
+    optimizer_state = payload.get("optimizer_state")
+    if optimizer_state is not None:
+        optimizer.load_state_dict(optimizer_state)
+        optimizer_to_device(optimizer, device)
+    return resolved_config, model, optimizer, payload.get("metadata", {})
 
 
 def collect_planner_steps(
@@ -113,11 +138,15 @@ def collect_planner_steps(
     }
 
 
-def run_training(config: dict[str, Any], output_dir: str | Path, replay_dir: str | Path | None = None) -> dict[str, Any]:
+def run_training(
+    config: dict[str, Any],
+    output_dir: str | Path,
+    replay_dir: str | Path | None = None,
+    resume_checkpoint: str | Path | None = None,
+) -> dict[str, Any]:
     seed = config.get("project", {}).get("seed", 0)
     seed_everything(seed)
     run_dirs = ensure_run_dirs(output_dir)
-    save_config(config, run_dirs["base"] / "resolved_config.yaml")
     device = get_device(config.get("training", {}).get("device"))
 
     env = make_env_from_config(config, seed=seed)
@@ -130,16 +159,44 @@ def run_training(config: dict[str, Any], output_dir: str | Path, replay_dir: str
     else:
         replay, collection_summary = collect_bootstrap_dataset(config, output_dir=run_dirs["replay"], seed=seed)
 
-    model = WorldModel.from_config(config, action_dim=action_dim).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=float(config["training"]["lr"]))
+    resume_metadata: dict[str, Any] = {}
+    if resume_checkpoint is not None:
+        config, model, optimizer, resume_metadata = load_training_state(
+            checkpoint_path=resume_checkpoint,
+            config=config,
+            action_dim=action_dim,
+            device=device,
+        )
+    else:
+        model = WorldModel.from_config(config, action_dim=action_dim).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=float(config["training"]["lr"]))
+
+    save_config(config, run_dirs["base"] / "resolved_config.yaml")
     training_logs: list[dict[str, float]] = []
     evaluation_logs: list[dict[str, float]] = []
 
     train_collect_ratio = float(config["collection"].get("train_collect_ratio", 1.0))
     total_updates_budget = int(config["training"]["train_steps"])
-    initial_updates = min(total_updates_budget, max(1, int(round(replay.env_steps * train_collect_ratio))))
-    training_logs.extend(train_world_model_updates(model, replay, optimizer, config, initial_updates, device))
-    updates_done = len(training_logs)
+    if resume_checkpoint is not None:
+        updates_done = int(resume_metadata.get("updates_done", 0))
+        checkpoint_env_steps = int(resume_metadata.get("env_steps", 0))
+        if replay.env_steps > checkpoint_env_steps and updates_done < total_updates_budget:
+            collect_steps_per_iteration = max(1, int(config["collection"].get("collect_steps_per_iteration", 1)))
+            per_iteration_updates = int(
+                config["collection"].get(
+                    "gradient_updates_per_iteration",
+                    round(collect_steps_per_iteration * train_collect_ratio),
+                )
+            )
+            missed_iterations = max(0, round((replay.env_steps - checkpoint_env_steps) / collect_steps_per_iteration))
+            catch_up_updates = min(total_updates_budget - updates_done, per_iteration_updates * missed_iterations)
+            catch_up_logs = train_world_model_updates(model, replay, optimizer, config, catch_up_updates, device)
+            training_logs.extend(catch_up_logs)
+            updates_done += len(catch_up_logs)
+    else:
+        initial_updates = min(total_updates_budget, max(1, int(round(replay.env_steps * train_collect_ratio))))
+        training_logs.extend(train_world_model_updates(model, replay, optimizer, config, initial_updates, device))
+        updates_done = len(training_logs)
 
     comparison_budgets = config.get("comparison", {}).get("env_steps", [replay.env_steps])
     target_env_steps = int(max(comparison_budgets))
@@ -215,6 +272,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--replay-dir", type=Path, default=None, help="Optional existing replay directory.")
+    parser.add_argument("--resume-checkpoint", type=Path, default=None, help="Optional checkpoint to resume from.")
     return parser
 
 
@@ -222,7 +280,12 @@ def main() -> None:
     parser = build_arg_parser()
     args = parser.parse_args()
     config = load_config(args.config)
-    summary = run_training(config, args.output_dir, replay_dir=args.replay_dir)
+    summary = run_training(
+        config,
+        args.output_dir,
+        replay_dir=args.replay_dir,
+        resume_checkpoint=args.resume_checkpoint,
+    )
     print(summary)
 
 
